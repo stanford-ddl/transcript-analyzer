@@ -28,6 +28,10 @@ except psycopg2.OperationalError as e:
 # Initialize FastAPI app
 app = FastAPI()
 
+@app.get("/")
+def read_root():
+    return {"message": "FastAPI is running on Railway!"}
+
 # Ensure necessary tables exist in the database
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS projects (
