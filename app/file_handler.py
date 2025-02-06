@@ -15,17 +15,7 @@ def create_upload_directory():
 
 # 3. Save Uploaded File Function (with Filename Collision Check):
 def save_uploaded_file(file: UploadFile) -> str:
-    """Saves an uploaded file, checking for filename collisions and retrying.
-
-    Args:
-        file: The UploadFile object.
-
-    Returns:
-        The full path to the saved file.
-
-    Raises:
-        HTTPException: If the file extension is invalid.
-    """
+    """Saves an uploaded file, checking for filename collisions and retrying."""
     create_upload_directory()
 
     # File Extension Check
@@ -37,18 +27,16 @@ def save_uploaded_file(file: UploadFile) -> str:
             detail=f"Invalid file type. Only {', '.join(allowed_extensions)} are allowed."
         )
 
-    # --- Generate Unique Filename with Collision Check ---
-    max_attempts = 10  # Limit the number of attempts to avoid infinite loops.
+    # Generate Unique Filename with Collision Check
+    max_attempts = 10
     for attempt in range(max_attempts):
         unique_filename = f"{uuid4()}{file_extension}"
         file_path = os.path.join(UPLOAD_DIR, unique_filename)
-
-        # Check if a file with this name already exists in the UPLOAD_DIR.
         if not os.path.exists(file_path):
-            break  # Filename is unique, exit the loop.
+            break
         else:
              print(f"Filename collision detected: {unique_filename}, retrying...")
-    else:  # This 'else' belongs to the 'for' loop. It executes if the loop completes without 'break'.
+    else:
         raise HTTPException(
             status_code=500, detail="Failed to generate a unique filename."
         )
@@ -78,15 +66,4 @@ def delete_file(file_path: str):
         return False
     except OSError as e:
         print(f"Error deleting file: {e}")
-        return False
-
-# 6. Placeholder Processing Function:
-def process_file(input_path: str, output_path: str):
-    """Placeholder for file processing. REPLACE THIS."""
-    try:
-        # *** REPLACE THIS WITH YOUR ACTUAL PROCESSING LOGIC ***
-        shutil.copyfile(input_path, output_path)  # Example: Copy the file.
-        return True
-    except Exception as e:
-        print(f"Error processing file: {e}")
         return False
