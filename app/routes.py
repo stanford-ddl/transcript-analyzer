@@ -1,10 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Response
-from app.database import get_db_connection  # Import the connection function
+from app.database import get_db_connection
 from app.file_handler import (
     save_uploaded_file,
     get_processed_file_path,
-    process_file,
 )
+from app.processing import process_file  # Import from processing.py
 from uuid import UUID
 import os
 from fastapi.responses import FileResponse
@@ -15,31 +15,31 @@ router = APIRouter()
 @router.post("/uploadfiles/")
 async def create_upload_files(files: list[UploadFile] = File(...)):
     """Uploads multiple files, processes them, and records them in the DB."""
-    conn, cursor = get_db_connection()  # Get database connection and cursor.
+    conn, cursor = get_db_connection()
     uploaded_file_ids = []
 
     for file in files:
         try:
-            # 1. Save the file (file_handler.py handles unique names and validation).
+            # 1. Save the file (file_handler.py).
             file_path = save_uploaded_file(file)
 
-            # 2. Insert file metadata into the database.
+            # 2. Insert into database.
             cursor.execute(
                 """
                 INSERT INTO files (file_name, status)
                 VALUES (%s, 'pending')
                 RETURNING id;
                 """,
-                (file.filename,),  # Store the *original* filename.
+                (file.filename,),
             )
             file_id = cursor.fetchone()["id"]
-            conn.commit()  # Commit after each successful file upload and insert.
+            conn.commit()
 
-            # 3. Process the file (using the placeholder function).
+            # 3. Process the file (processing.py).
             output_filename = f"processed_{file.filename}"
             output_path = get_processed_file_path(output_filename)
             if process_file(file_path, output_path):
-                # 4. Update database with processed status.
+                # 4. Update database (processed).
                 cursor.execute(
                     """
                     UPDATE files
@@ -48,9 +48,9 @@ async def create_upload_files(files: list[UploadFile] = File(...)):
                     """,
                     (file_id,),
                 )
-                conn.commit() # Commit after each successful file process and update
+                conn.commit()
             else:
-                #If processing fails, update to a failed status
+                #If processing failed, mark as failed in database
                 cursor.execute(
                     """
                     UPDATE files
@@ -61,11 +61,12 @@ async def create_upload_files(files: list[UploadFile] = File(...)):
                 )
                 conn.commit()
 
+
             uploaded_file_ids.append({"file_id": file_id, "filename": file.filename})
 
-        except HTTPException as e:  # Catch HTTP exceptions (e.g., from file_handler).
-            conn.rollback()  # Rollback if any error occurred during file save/insert.
-            raise e  # Re-raise the exception to return the error to the client.
+        except HTTPException as e:
+            conn.rollback()
+            raise e
         except Exception as e:
             conn.rollback()
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
@@ -89,13 +90,13 @@ async def download_file(file_id: UUID):
     if file_info["status"] != "processed":
         raise HTTPException(status_code=400, detail="File not processed yet")
 
-    # Construct the path to the *processed* file.
     original_filename = file_info["file_name"]
     processed_filename = f"processed_{original_filename}"
     file_path = get_processed_file_path(processed_filename)
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Processed file not found on server")
+
 
     return FileResponse(
         file_path, filename=original_filename, media_type="application/octet-stream"
