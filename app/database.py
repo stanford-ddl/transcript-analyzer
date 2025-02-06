@@ -12,6 +12,14 @@ if not DATABASE_URL:
 try:
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     cursor = conn.cursor()
+    print("Successfully connected to the database!") # Good for debugging
 except psycopg2.OperationalError as e:
     print("Error connecting to the database:", e)
     raise
+
+def get_db_connection():
+    """
+    Returns the database connection and cursor.  This is a helper function
+    to make it easier to access the connection from other modules.
+    """
+    return conn, cursor
