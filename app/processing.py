@@ -1,56 +1,33 @@
-import asyncio
-import aiohttp
-import json
-from app.database import cursor, conn
-from app.job_handler import update_job_progress
+import openpyxl  # For XLSX processing
+import shutil #for CSV processing
 
-API_URL = "https://api.anthropic.com/v1/messages"
-API_KEY = "YOUR_ACTUAL_API_KEY"
+def process_file(input_path: str, output_path: str) -> bool:
+    """Processes an XLSX or CSV file.
 
-async def analyze_utterance(text: str):
-    """Sends an utterance to Anthropic API for analysis."""
-    payload = {
-        "model": "claude-3-5-sonnet-20241022",
-        "messages": [{"role": "user", "content": text}]
-    }
+    For XLSX: Modifies cell A1 to "Hello World".
+    For CSV: Copies the file (no modification).
 
-    headers = {
-        "x-api-key": API_KEY,
-        "content-type": "application/json",
-        "anthropic-version": "2023-06-01",
-    }
+    Args:
+        input_path: Path to the original uploaded file.
+        output_path: Path to save the processed file.
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(API_URL, headers=headers, json=payload) as response:
-            return await response.json()
+    Returns:
+        True if processing was successful, False otherwise.
+    """
+    try:
+        file_extension = os.path.splitext(input_path)[1].lower()
 
-async def process_file(file_id: str, file_path: str, job_id: str):
-    """Reads a transcript file and processes each utterance."""
-    with open(file_path, 'r') as f:
-        data = json.load(f)
+        if file_extension == ".xlsx":
+            workbook = openpyxl.load_workbook(input_path)
+            sheet = workbook.active  # Or select a specific sheet
+            sheet["A1"] = "Hello World"
+            workbook.save(output_path)
+        elif file_extension == ".csv":
+            shutil.copyfile(input_path, output_path)  # Just copy CSV files
+        else:
+            return False #Should not happen, but handle just in case
 
-    utterances = data.get("utterances", [])
-    processed_utterances = await asyncio.gather(*[analyze_utterance(u["text"]) for u in utterances])
-
-    # Update DB
-    cursor.execute("UPDATE files SET status = 'processed', results = %s WHERE id = %s;",
-                   (json.dumps(processed_utterances), file_id))
-    conn.commit()
-
-    # Update job progress
-    update_job_progress(job_id)
-
-def process_job(job_id: str):
-    """Processes all pending files for a job and updates progress."""
-    cursor.execute("SELECT id, file_name FROM files WHERE job_id = %s AND status = 'pending';", (job_id,))
-    files = cursor.fetchall()
-
-    if not files:
-        return {"message": "No pending files to process."}
-
-    for file in files:
-        file_id = file["id"]
-        file_path = f"uploads/{file_id}_{file['file_name']}"
-        asyncio.run(process_file(file_id, file_path, job_id))
-
-    return {"message": "Processing started for all pending files."}
+        return True
+    except Exception as e:
+        print(f"Error processing file: {e}")  # Log errors
+        return False
