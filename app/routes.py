@@ -4,7 +4,7 @@ from app.file_handler import (
     save_uploaded_file,
     get_processed_file_path,
 )
-from app.processing import process_file  # Import from processing.py
+from app.processing import process_file
 from uuid import UUID
 import os
 from fastapi.responses import FileResponse
@@ -46,7 +46,7 @@ async def create_upload_files(files: list[UploadFile] = File(...)):
                     SET status = 'processed', processed_at = CURRENT_TIMESTAMP
                     WHERE id = %s;
                     """,
-                    (file_id,),
+                    (str(file_id),), #Convert UUID to string here too
                 )
                 conn.commit()
             else:
@@ -57,7 +57,7 @@ async def create_upload_files(files: list[UploadFile] = File(...)):
                     SET status = 'failed'
                     WHERE id = %s;
                     """,
-                    (file_id,),
+                    (str(file_id),), #Convert UUID to string here too
                 )
                 conn.commit()
 
@@ -80,7 +80,7 @@ async def download_file(file_id: UUID):
     """Downloads a processed file by its ID."""
     conn, cursor = get_db_connection()
     cursor.execute(
-        "SELECT file_name, status FROM files WHERE id = %s;", (file_id,)
+        "SELECT file_name, status FROM files WHERE id = %s;", (str(file_id),)  # Convert UUID to string
     )
     file_info = cursor.fetchone()
 
