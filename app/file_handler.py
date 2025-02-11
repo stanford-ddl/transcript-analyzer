@@ -4,8 +4,12 @@ from uuid import uuid4
 from fastapi import UploadFile, HTTPException
 
 # 1. Define Storage Directories:
-UPLOAD_DIR = "/storage/inputs"  # Primary upload directory (Railway volume).
-PROCESSED_DIR = "/storage/outputs"  # Directory for processed files.
+# Dynamically determine the Codespace name
+CODESPACE_NAME = os.environ.get("CODESPACE_NAME", "your-default-codespace-name")  # Provide a default
+
+# Construct the paths relative to the Codespace root
+UPLOAD_DIR = f"/workspaces/{CODESPACE_NAME}/.devcontainer/storage/inputs"
+PROCESSED_DIR = f"/workspaces/{CODESPACE_NAME}/.devcontainer/storage/outputs"
 
 # 2. Directory Creation Function:
 def create_upload_directory():
