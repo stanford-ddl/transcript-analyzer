@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Start FastAPI Server",
+        "type": "shell",
+        "command": "uvicorn app.main:app --host 0.0.0.0 --port 8000",
+        "problemMatcher": [],
+        "isBackground": true, // Important: Run in the background
+        "runOptions": {
+          "runOn": "folderOpen" // Run automatically on Codespace start
+        },
+          "presentation": {
+              "reveal": "always",
+              "panel": "new" // Show output in a new terminal panel
+          }
+      }
+    ]
+  }

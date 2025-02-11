@@ -1,0 +1,43 @@
+{
+  "name": "FastAPI with PostgreSQL (Features)",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+        "installZsh": "true",
+        "username": "vscode",
+        "uid": "1000",
+        "gid": "1000"
+      },
+    "ghcr.io/itsmechlark/features/postgresql:1.5.0": {
+      "version": "15"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "njpwerner.autodocstring"
+      ]
+    }
+  },
+  "postCreateCommand": "pip install -r requirements.txt",
+  "forwardPorts": [8000, 5432],
+  "portsAttributes": {
+    "8000": {
+      "label": "API",
+      "onAutoForward": "openBrowser"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteUser": "vscode",
+  "remoteEnv": {
+    "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
+    "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
+    "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
+    "POSTGRES_HOST": "localhost"
+  }
+}
