@@ -1,6 +1,6 @@
-import openpyxl  # For XLSX processing
-import shutil #for CSV processing
 import os
+import shutil #for CSV processing
+import openpyxl  # For XLSX processing
 
 def process_file(input_path: str, output_path: str) -> bool:
     """Processes an XLSX or CSV file.

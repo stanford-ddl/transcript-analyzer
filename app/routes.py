@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 router = APIRouter()
 
 # --- Upload Multiple Files ---
-@router.post("/uploadfiles/")
+@router.post("/uploadfiles/")  # No project_id
 async def create_upload_files(files: list[UploadFile] = File(...)):
     """Uploads multiple files, processes them, and records them in the DB."""
     conn, cursor = get_db_connection()
@@ -20,13 +20,10 @@ async def create_upload_files(files: list[UploadFile] = File(...)):
 
     for file in files:
         try:
-            # 1. Save the file (file_handler.py).
             file_path = save_uploaded_file(file)
-
-            # 2. Insert into database.
             cursor.execute(
                 """
-                INSERT INTO files (file_name, status)
+                INSERT INTO files (file_name, status)  -- No project_id
                 VALUES (%s, 'pending')
                 RETURNING id;
                 """,
@@ -35,32 +32,30 @@ async def create_upload_files(files: list[UploadFile] = File(...)):
             file_id = cursor.fetchone()["id"]
             conn.commit()
 
-            # 3. Process the file (processing.py).
+            # --- Processing (Simplified for brevity) ---
             output_filename = f"processed_{file.filename}"
             output_path = get_processed_file_path(output_filename)
             if process_file(file_path, output_path):
-                # 4. Update database (processed).
                 cursor.execute(
                     """
                     UPDATE files
                     SET status = 'processed', processed_at = CURRENT_TIMESTAMP
                     WHERE id = %s;
                     """,
-                    (str(file_id),), #Convert UUID to string here too
+                    (str(file_id),),
                 )
                 conn.commit()
             else:
-                #If processing failed, mark as failed in database
                 cursor.execute(
                     """
                     UPDATE files
                     SET status = 'failed'
                     WHERE id = %s;
                     """,
-                    (str(file_id),), #Convert UUID to string here too
+                    (str(file_id),),
                 )
                 conn.commit()
-
+            # ---
 
             uploaded_file_ids.append({"file_id": file_id, "filename": file.filename})
 
@@ -70,6 +65,8 @@ async def create_upload_files(files: list[UploadFile] = File(...)):
         except Exception as e:
             conn.rollback()
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+        finally:
+            cursor.close()
 
     return {"uploaded_files": uploaded_file_ids}
 
