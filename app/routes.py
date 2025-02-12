@@ -14,65 +14,55 @@ router = APIRouter()
 # --- Upload Multiple Files ---
 @router.post("/uploadfiles/")
 async def create_upload_files(files: list[UploadFile] = File(...)):
-    """Uploads multiple files, processes them, and records them in the DB."""
+    """Uploads multiple files and queues them for processing."""
     conn, cursor = get_db_connection()
     uploaded_file_ids = []
 
     try:
         # Create a new file_set
-        file_set_id = uuid4()
+        file_set_id = str(uuid4())
         cursor.execute(
             "INSERT INTO file_sets (id) VALUES (%s) RETURNING id;",
-            (str(file_set_id),)
+            (file_set_id,)
         )
         conn.commit()
 
         for file in files:
-            try:
-                file_path = save_uploaded_file(file)
-                cursor.execute(
-                    """
-                    INSERT INTO files (id, file_set_id, file_path, original_filename, status)
-                    VALUES (%s, %s, %s, %s, 'pending')
-                    RETURNING id;
-                    """,
-                    (str(uuid4()), str(file_set_id), file_path, file.filename),
-                )
-                file_id = cursor.fetchone()["id"]
-                conn.commit()
+            file_id = str(uuid4())
+            
+            # Read file content
+            file_content = await file.read()
+            
+            # Create file record with pending status
+            cursor.execute(
+                """
+                INSERT INTO files (id, file_set_id, original_filename, status)
+                VALUES (%s, %s, %s, 'pending')
+                RETURNING id;
+                """,
+                (file_id, file_set_id, file.filename)
+            )
+            conn.commit()
 
-                # Processing remains similar but updates different status
-                output_filename = f"processed_{file.filename}"
-                output_path = get_processed_file_path(output_filename)
-                if process_file(file_path, output_path):
-                    cursor.execute(
-                        """
-                        UPDATE files
-                        SET status = 'processed'
-                        WHERE id = %s;
-                        """,
-                        (str(file_id),),
-                    )
-                    conn.commit()
-                else:
-                    cursor.execute(
-                        """
-                        UPDATE files
-                        SET status = 'failed'
-                        WHERE id = %s;
-                        """,
-                        (str(file_id),),
-                    )
-                    conn.commit()
+            # Queue the file processing task
+            process_uploaded_file.delay(
+                file_id,
+                file_set_id,
+                file_content,
+                file.filename
+            )
 
-                uploaded_file_ids.append({"file_id": file_id, "filename": file.filename})
+            uploaded_file_ids.append({"file_id": file_id, "filename": file.filename})
 
-            except Exception as e:
-                conn.rollback()
-                raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+        return {
+            "message": "Files uploaded and queued for processing",
+            "file_set_id": file_set_id,
+            "uploaded_files": uploaded_file_ids
+        }
 
-        return {"file_set_id": file_set_id, "uploaded_files": uploaded_file_ids}
-
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
     finally:
         cursor.close()
 
@@ -119,3 +109,28 @@ async def list_files():
     """)
     files = cursor.fetchall()
     return files
+
+@router.get("/status/{file_set_id}")
+async def get_processing_status(file_set_id: str):
+    """Get the processing status of all files in a file set."""
+    conn, cursor = get_db_connection()
+    try:
+        cursor.execute(
+            """
+            SELECT id, original_filename, status
+            FROM files
+            WHERE file_set_id = %s
+            """,
+            (file_set_id,)
+        )
+        files = cursor.fetchall()
+        
+        if not files:
+            raise HTTPException(status_code=404, detail="File set not found")
+            
+        return {
+            "file_set_id": file_set_id,
+            "files": files
+        }
+    finally:
+        cursor.close()
