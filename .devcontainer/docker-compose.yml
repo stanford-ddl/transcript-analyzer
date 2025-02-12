@@ -16,7 +16,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_HOST=db # Use the service name as the hostname
+      - POSTGRES_HOST=db  # Use the service name as the hostname
+    ports:  # <--- ADD THIS SECTION
+      - "8000:8000"
 
   db:
     image: postgres:15  # Choose your desired PostgreSQL version

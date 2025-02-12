@@ -1,8 +1,8 @@
-"""Create file_sets, files, projects, and jobs tables
+"""Intitial migration
 
-Revision ID: e61f170df9ab
-Revises: 6c12fcedb21c
-Create Date: 2025-02-12 04:16:57.653815
+Revision ID: 0955580b097f
+Revises: 
+Create Date: 2025-02-12 07:11:25.065412
 
 """
 from typing import Sequence, Union
@@ -11,10 +11,9 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-
 # revision identifiers, used by Alembic.
-revision: str = 'e61f170df9ab'
-down_revision: Union[str, None] = '6c12fcedb21c'
+revision: str = '0955580b097f'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

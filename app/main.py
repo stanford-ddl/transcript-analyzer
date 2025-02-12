@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+import uvicorn
 from app.routes import router  # Import all routes
 
 app = FastAPI()
@@ -8,4 +9,7 @@ app.include_router(router)
 
 @app.get("/")
 def read_root():
-    return {"message": "FastAPI is running on Railway!"}
+    return {"message": "FastAPI is running!"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
