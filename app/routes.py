@@ -5,70 +5,76 @@ from app.file_handler import (
     get_processed_file_path,
 )
 from app.processing import process_file
-from uuid import UUID
+from uuid import UUID, uuid4
 import os
 from fastapi.responses import FileResponse
 
 router = APIRouter()
 
 # --- Upload Multiple Files ---
-@router.post("/uploadfiles/")  # No project_id
+@router.post("/uploadfiles/")
 async def create_upload_files(files: list[UploadFile] = File(...)):
     """Uploads multiple files, processes them, and records them in the DB."""
     conn, cursor = get_db_connection()
     uploaded_file_ids = []
 
-    for file in files:
-        try:
-            file_path = save_uploaded_file(file)
-            cursor.execute(
-                """
-                INSERT INTO files (file_name, status)  -- No project_id
-                VALUES (%s, 'pending')
-                RETURNING id;
-                """,
-                (file.filename,),
-            )
-            file_id = cursor.fetchone()["id"]
-            conn.commit()
+    try:
+        # Create a new file_set
+        file_set_id = uuid4()
+        cursor.execute(
+            "INSERT INTO file_sets (id) VALUES (%s) RETURNING id;",
+            (str(file_set_id),)
+        )
+        conn.commit()
 
-            # --- Processing (Simplified for brevity) ---
-            output_filename = f"processed_{file.filename}"
-            output_path = get_processed_file_path(output_filename)
-            if process_file(file_path, output_path):
+        for file in files:
+            try:
+                file_path = save_uploaded_file(file)
                 cursor.execute(
                     """
-                    UPDATE files
-                    SET status = 'processed', processed_at = CURRENT_TIMESTAMP
-                    WHERE id = %s;
+                    INSERT INTO files (id, file_set_id, file_path, original_filename, status)
+                    VALUES (%s, %s, %s, %s, 'pending')
+                    RETURNING id;
                     """,
-                    (str(file_id),),
+                    (str(uuid4()), str(file_set_id), file_path, file.filename),
                 )
+                file_id = cursor.fetchone()["id"]
                 conn.commit()
-            else:
-                cursor.execute(
-                    """
-                    UPDATE files
-                    SET status = 'failed'
-                    WHERE id = %s;
-                    """,
-                    (str(file_id),),
-                )
-                conn.commit()
-            # ---
 
-            uploaded_file_ids.append({"file_id": file_id, "filename": file.filename})
+                # Processing remains similar but updates different status
+                output_filename = f"processed_{file.filename}"
+                output_path = get_processed_file_path(output_filename)
+                if process_file(file_path, output_path):
+                    cursor.execute(
+                        """
+                        UPDATE files
+                        SET status = 'processed'
+                        WHERE id = %s;
+                        """,
+                        (str(file_id),),
+                    )
+                    conn.commit()
+                else:
+                    cursor.execute(
+                        """
+                        UPDATE files
+                        SET status = 'failed'
+                        WHERE id = %s;
+                        """,
+                        (str(file_id),),
+                    )
+                    conn.commit()
 
-        except HTTPException as e:
-            conn.rollback()
-            raise e
-        except Exception as e:
-            conn.rollback()
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
-        finally:
-            cursor.close()
+                uploaded_file_ids.append({"file_id": file_id, "filename": file.filename})
 
-    return {"uploaded_files": uploaded_file_ids}
+            except Exception as e:
+                conn.rollback()
+                raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+        return {"file_set_id": file_set_id, "uploaded_files": uploaded_file_ids}
+
+    finally:
+        cursor.close()
 
 
 # --- Download a File ---
@@ -77,7 +83,8 @@ async def download_file(file_id: UUID):
     """Downloads a processed file by its ID."""
     conn, cursor = get_db_connection()
     cursor.execute(
-        "SELECT file_name, status FROM files WHERE id = %s;", (str(file_id),)  # Convert UUID to string
+        "SELECT original_filename, status, file_path FROM files WHERE id = %s;",
+        (str(file_id),)
     )
     file_info = cursor.fetchone()
 
@@ -87,13 +94,12 @@ async def download_file(file_id: UUID):
     if file_info["status"] != "processed":
         raise HTTPException(status_code=400, detail="File not processed yet")
 
-    original_filename = file_info["file_name"]
+    original_filename = file_info["original_filename"]
     processed_filename = f"processed_{original_filename}"
     file_path = get_processed_file_path(processed_filename)
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Processed file not found on server")
-
 
     return FileResponse(
         file_path, filename=original_filename, media_type="application/octet-stream"
@@ -105,6 +111,11 @@ async def download_file(file_id: UUID):
 async def list_files():
     """Lists all files and their statuses."""
     conn, cursor = get_db_connection()
-    cursor.execute("SELECT id, file_name, status, uploaded_at, processed_at FROM files;")
+    cursor.execute("""
+        SELECT f.id, f.original_filename, f.status, f.created_at, f.file_set_id
+        FROM files f
+        LEFT JOIN file_sets fs ON f.file_set_id = fs.id
+        ORDER BY f.created_at DESC;
+    """)
     files = cursor.fetchall()
     return files
