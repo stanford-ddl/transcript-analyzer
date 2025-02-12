@@ -3,6 +3,15 @@ import shutil
 from uuid import uuid4
 from fastapi import UploadFile, HTTPException
 
+# Constants for file handling
+CHUNK_SIZE = 1024 * 1024  # 1MB chunks
+UPLOAD_DIR = "app/storage/uploads"
+PROCESSED_DIR = "app/storage/processed"
+
+# Constants for validation
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB per file
+ALLOWED_EXTENSIONS = {'.xlsx', '.csv'}
+
 # 1. Define Storage Directories:
 # Dynamically determine the Codespace name
 CODESPACE_NAME = os.environ.get("CODESPACE_NAME", "your-default-codespace-name")  # Provide a default
@@ -16,6 +25,46 @@ def create_upload_directory():
     """Ensures the upload and processed directories exist."""
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(PROCESSED_DIR, exist_ok=True)
+
+def validate_file(file: UploadFile) -> None:
+    """Validate individual file properties"""
+    # Check file extension
+    file_extension = os.path.splitext(file.filename)[1].lower()
+    if file_extension not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+    
+    # Check file size (if available)
+    if hasattr(file, 'size') and file.size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size: {MAX_FILE_SIZE/1024/1024}MB"
+        )
+
+async def save_uploaded_file_streaming(file: UploadFile) -> str:
+    """Save file using streaming"""
+    ensure_directories()
+    validate_file(file)  # Validate before saving
+    
+    file_extension = os.path.splitext(file.filename)[1].lower()
+    unique_filename = f"{uuid4()}{file_extension}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    
+    size = 0
+    try:
+        with open(file_path, "wb") as buffer:
+            while chunk := await file.read(CHUNK_SIZE):
+                size += len(chunk)
+                if size > MAX_FILE_SIZE:  # Check size during streaming
+                    raise HTTPException(status_code=400, detail="File too large")
+                buffer.write(chunk)
+        return file_path
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise e
 
 # 3. Save Uploaded File Function (with Filename Collision Check):
 def save_uploaded_file(file: UploadFile) -> str:

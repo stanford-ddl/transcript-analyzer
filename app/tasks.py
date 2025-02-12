@@ -1,7 +1,7 @@
 from app.celery_config import celery_app
 from app.file_handler import save_uploaded_file, get_processed_file_path
 from app.processing import process_file
-from app.database import get_db_connection
+from app.database import get_db_connection, release_db_connection
 from uuid import uuid4
 
 @celery_app.task(bind=True)
@@ -61,4 +61,53 @@ def process_uploaded_file(self, file_id: str, file_set_id: str, file_data: bytes
         conn.commit()
         return {"status": "error", "error": str(e)}
     finally:
-        cursor.close()
+        release_db_connection(conn, cursor)
+
+@celery_app.task(bind=True)
+def process_file_set(self, file_set_id: str):
+    """Process all files in a file set"""
+    conn, cursor = get_db_connection()
+    try:
+        cursor.execute(
+            """
+            SELECT id, original_filename, file_path
+            FROM files
+            WHERE file_set_id = %s AND status = 'pending'
+            """,
+            (file_set_id,)
+        )
+        files = cursor.fetchall()
+        
+        results = []
+        for file in files:
+            output_filename = f"processed_{file['original_filename']}"
+            output_path = get_processed_file_path(output_filename)
+            
+            if process_file(file['file_path'], output_path):
+                cursor.execute(
+                    """
+                    UPDATE files
+                    SET status = 'processed'
+                    WHERE id = %s;
+                    """,
+                    (file['id'],)
+                )
+                results.append({"file_id": file['id'], "status": "success"})
+            else:
+                cursor.execute(
+                    """
+                    UPDATE files
+                    SET status = 'failed'
+                    WHERE id = %s;
+                    """,
+                    (file['id'],)
+                )
+                results.append({"file_id": file['id'], "status": "failed"})
+            conn.commit()
+            
+        return {"status": "success", "results": results}
+        
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+    finally:
+        release_db_connection(conn, cursor)

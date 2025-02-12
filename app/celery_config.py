@@ -12,4 +12,8 @@ celery_app.conf.update(
     result_serializer='json',
     timezone='UTC',
     enable_utc=True,
+    task_routes={
+        'app.tasks.process_uploaded_file': {'queue': 'file_processing'},
+        'app.tasks.process_file_set': {'queue': 'file_set_processing'},
+    }
 )
