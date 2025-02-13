@@ -1,5 +1,5 @@
 import uuid
-from app.database import cursor, conn
+from backend.database import cursor, conn
 
 def create_job(user_id: str) -> str:
     """Create a new job entry and return the job ID."""

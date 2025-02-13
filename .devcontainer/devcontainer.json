@@ -1,8 +1,8 @@
 {
   "name": "FastAPI Development Environment",
   "dockerComposeFile": "docker-compose.yml",
-  "service": "app",
-  "workspaceFolder": "/workspace",
+  "service": "backend",
+  "workspaceFolder": "/app",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -17,6 +17,5 @@
     }
   },
   "remoteUser": "vscode",
-  "forwardPorts": [8000, 5432, 6379],
-  "postCreateCommand": "pip install --upgrade -r requirements.txt"
+  "forwardPorts": [8000, 5432, 6379]
 }

@@ -1,7 +1,7 @@
-from app.celery_config import celery_app
-from app.file_handler import save_uploaded_file, get_processed_file_path
-from app.processing import process_file
-from app.database import get_db_connection, release_db_connection
+from backend.celery_config import celery_app
+from backend.file_handler import save_uploaded_file, get_processed_file_path
+from backend.processing import process_file
+from backend.database import get_db_connection, release_db_connection
 from uuid import uuid4
 
 @celery_app.task(bind=True)

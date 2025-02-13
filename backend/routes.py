@@ -1,16 +1,16 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Response, BackgroundTasks
-from app.database import get_db_connection, release_db_connection
-from app.file_handler import (
+from backend.database import get_db_connection, release_db_connection
+from backend.file_handler import (
     save_uploaded_file,
     get_processed_file_path,
     save_uploaded_file_streaming,
     MAX_FILE_SIZE,
 )
-from app.processing import process_file
+from backend.processing import process_file
 from uuid import UUID, uuid4
 import os
 from fastapi.responses import FileResponse
-from app.tasks import process_uploaded_file, process_file_set
+from backend.tasks import process_uploaded_file, process_file_set
 from celery.result import AsyncResult
 
 router = APIRouter()
