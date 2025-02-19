@@ -5,20 +5,17 @@ from fastapi import UploadFile, HTTPException
 
 # Constants for file handling
 CHUNK_SIZE = 1024 * 1024  # 1MB chunks
-UPLOAD_DIR = "app/storage/uploads"
-PROCESSED_DIR = "app/storage/processed"
+UPLOAD_DIR = ".devcontainer/storage/inputs"
+PROCESSED_DIR = ".devcontainer/storage/outputs"
 
 # Constants for validation
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB per file
 ALLOWED_EXTENSIONS = {'.xlsx', '.csv'}
 
-# 1. Define Storage Directories:
-# Dynamically determine the Codespace name
-CODESPACE_NAME = os.environ.get("CODESPACE_NAME", "your-default-codespace-name")  # Provide a default
-
-# Construct the paths relative to the Codespace root
-UPLOAD_DIR = f"/workspaces/{CODESPACE_NAME}/.devcontainer/storage/inputs"
-PROCESSED_DIR = f"/workspaces/{CODESPACE_NAME}/.devcontainer/storage/outputs"
+def ensure_directories():
+    """Ensures the upload and processed directories exist."""
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
 
 # 2. Directory Creation Function:
 def create_upload_directory():

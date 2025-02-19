@@ -9,12 +9,11 @@
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-azuretools.vscode-docker"
-      ],
-      "settings": {
-        "python.linting.enabled": true,
-        "python.formatting.provider": "black"
-      }
+      ]
     }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
   "remoteUser": "vscode",
   "forwardPorts": [8000, 5432, 6379]
